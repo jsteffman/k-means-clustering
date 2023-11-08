@@ -238,9 +238,9 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),leg_5_clust,rel_width
 
 
 ### `r fa("earth-americas", fill = "steelblue")` This work supported by the NSF (BCS-1944773) 
-### `r fa("github", fill = "steelblue")` Github repository for this code: {INSERT HERE}
+### `r fa("github", fill = "steelblue")` Github repository for this code: https://github.com/jsteffman/k-means-clustering
 
-This will also eventually be a more fully fleshed out tutorial on https://jsteffman.github.io/teaching.html. 
+This will also eventually (...) be a more fully fleshed out tutorial on https://jsteffman.github.io/teaching.html. 
 
 
 - R package for traditional k-means clustering: Charrad, M., Ghazzali, N., Boiteau, V., Niknafs, A. (2014). NbClust: An R Package for Determining the Relevant Number of Clusters in a Data Set. Journal of Statistical Software, 61(6), 1-36. URL http://www.jstatsoft.org/v61/i06/.
