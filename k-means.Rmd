@@ -237,10 +237,10 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),leg_5_clust,rel_width
 ## A few first things
 
 
-### `r fa("earth-americas", fill = "steelblue")` This work supported by the NSF (BCS-1944773) 
-### `r fa("github", fill = "steelblue")` Github repository for this code: https://github.com/jsteffman/k-means-clustering
+### `r fa("earth-americas", fill = "steelblue")` This work supported by the NSF (BCS-1944773, PI Jennifer Cole) 
+### `r fa("github", fill = "steelblue")` Repository: https://github.com/jsteffman/k-means-clustering
 
-This will also eventually (...) be a more fully fleshed out tutorial on https://jsteffman.github.io/teaching.html. 
+This will also eventually (...) be a tutorial on https://jsteffman.github.io/teaching.html. 
 
 
 - R package for traditional k-means clustering: Charrad, M., Ghazzali, N., Boiteau, V., Niknafs, A. (2014). NbClust: An R Package for Determining the Relevant Number of Clusters in a Data Set. Journal of Statistical Software, 61(6), 1-36. URL http://www.jstatsoft.org/v61/i06/.
@@ -254,6 +254,8 @@ This will also eventually (...) be a more fully fleshed out tutorial on https://
 
 ## Imitative Speech production paradigm
 
+### `r fa("people-group", fill = "steelblue")` 30 American English speakers 
+
 
 ### `r fa("headphones", fill = "steelblue")` 3 model utterances heard on a trial, 2 different speakers
 - "She quoted Helena", "He answered Jeremy", "Her name is Marilyn"
@@ -265,7 +267,7 @@ This will also eventually (...) be a more fully fleshed out tutorial on https://
 
 
 ### `r fa("signal", fill = "steelblue")` F0 measures over the final word
-- Here, 30 time-normalised samples, speaker means for each of the 8 stimulus tunes 
+- Here, 30 time-normalised samples, speaker means for each of the 8 stimulus tunes (8 trajectories per speaker, 240 total)
 - Converted to ERB and scaled within speaker (normalising speaker F0 level/range differences)
 
 
@@ -1561,34 +1563,31 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),
 
 ## Concluding remarks
 
-### K-means offers a fairly intuitive way of assessing groupings in data
+### `r fa("check", fill = "steelblue")` K-means offers a fairly intuitive way of assessing groupings in data
 - And is easily implemented for time series data
 - Robust to outliers
 - Tests of different numbers of k can be interweaved with domain knowledge or predictions
 
-### There are however, crucial considerations
+### `r fa("bell", fill = "steelblue")` There are however, crucial considerations
 
 - Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
 - This makes k selection, and optimization a crucial part of the k-means workflow
 - This can happen all "under the hood" in R, with various degrees of researcher intervention
-#### 
 - Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
-
 
 
 ## Concluding remarks
 
-### K-means offers a fairly intuitive way of assessing groupings in data
+### `r fa("check", fill = "steelblue")` K-means offers a fairly intuitive way of assessing groupings in data
 - And is easily implemented for time series data
 - Robust to outliers
 - Tests of different numbers of k can be interweaved with domain knowledge or predictions
 
-### There are however, crucial considerations
+### `r fa("bell", fill = "steelblue")` There are however, crucial considerations
 
 - Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
 - This makes k selection, and optimization a crucial part of the k-means workflow
 - This can happen all "under the hood" in R, with various degrees of researcher intervention
-#### 
 - Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
 
 ### `r fa("user-check", fill = "steelblue")` Thank you! 
