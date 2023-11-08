@@ -1,0 +1,1594 @@
+---
+title: "K-means clustering <br> for time-series data"
+subtitle: "An illustration with Intonational Tunes"
+author: "Jeremy Steffman ~ The University of Edinburgh"
+date: "9 November, 2023"
+output: 
+  ioslides_presentation:
+    css: style2.css
+    smaller: true
+    widescreen: true
+ 
+    
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+<style>
+div.footnotes {
+  position: absolute;
+  bottom: 0;
+  margin-bottom: 10px;
+  width: 80%;
+  font-size: 0.6em;
+}
+</style>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+    $('slide:not(.backdrop):not(.title-slide)').append('<div class=\"footnotes\">');
+
+    $('footnote').each(function(index) {
+      var text  = $(this).html();
+      var fnNum = (index+1).toString().sup();
+      $(this).html(text + fnNum);
+
+      var footnote   = fnNum + ': ' + $(this).attr('content') + '<br/>';
+      var oldContent = $(this).parents('slide').children('div.footnotes').html();
+      var newContent = oldContent + footnote;
+      $(this).parents('slide').children('div.footnotes').html(newContent);
+    });
+  });
+</script>
+
+
+
+```{r analysis, include=FALSE}
+library(tidyverse)
+library(cowplot)
+library(ggthemes)
+library(NbClust)
+library(gifski)
+library(fontawesome)
+theme_set(theme_cowplot(16))
+
+# load in model f0 
+model_f0<-read.csv("b8_resynth_target_hz.csv")
+
+## plot the model F0
+
+model_f0 %>% 
+ggplot(aes(x=(t2-1)/6,y=erb,lty=gender,color=tune))+
+  stat_summary(geom="line",size=1)+
+  scale_color_colorblind()+
+  scale_x_continuous(breaks = c(0.25,0.75))+
+  xlab("prop. word duration")+
+  ylab("ERB")+
+  facet_wrap(~tune,nrow=2)+
+  theme(legend.position = "none") ->models_f0
+
+## load in and cluster on 2d TCoG data
+
+tcog_data<-read.csv("b8_tcog_data_means.csv")
+
+
+tcog_data %>% select(tcog_t_scaled,tcog_f_scaled) -> tcog_data_for_clust
+
+NbClust(data = tcog_data_for_clust, diss = NULL, distance = "euclidean", min.nc = 2, max.nc = 8,
+        method = "kmeans", index = "all", alphaBeale = 0.1) ->twodim_kmeans_2min
+
+twodim_kmeans_2min$Best.partition -> twodim_2clust
+
+
+NbClust(data = tcog_data_for_clust, diss = NULL, distance = "euclidean", min.nc = 3, max.nc = 8,
+        method = "kmeans", index = "all", alphaBeale = 0.1) ->twodim_kmeans_3min
+
+twodim_kmeans_3min$Best.partition  -> twodim_3clust
+
+
+NbClust(data = tcog_data_for_clust, diss = NULL, distance = "euclidean", min.nc = 4, max.nc = 8,
+        method = "kmeans", index = "all", alphaBeale = 0.1) ->twodim_kmeans_4min
+
+twodim_kmeans_4min$Best.partition  -> twodim_4clust
+
+
+NbClust(data = tcog_data_for_clust, diss = NULL, distance = "euclidean", min.nc = 5, max.nc = 8,
+        method = "kmeans", index = "all", alphaBeale = 0.1) ->twodim_kmeans_5min
+
+twodim_kmeans_5min$Best.partition  -> twodim_5clust
+
+
+NbClust(data = tcog_data_for_clust, diss = NULL, distance = "euclidean", min.nc = 20, max.nc = 30,
+        method = "kmeans", index = "all", alphaBeale = 0.1) ->twodim_kmeans_20min
+
+twodim_kmeans_20min$Best.partition  -> twodim_20clust
+
+NbClust(data = tcog_data_for_clust, diss = NULL, distance = "euclidean", min.nc = 40, max.nc = 50,
+        method = "kmeans", index = "all", alphaBeale = 0.1) ->twodim_kmeans_40min
+
+twodim_kmeans_40min$Best.partition  -> twodim_40clust
+
+
+cbind(tcog_data_for_clust,twodim_2clust,twodim_3clust,twodim_4clust,twodim_5clust,twodim_20clust,twodim_40clust) -> two_dim_tcog_allsolutions
+
+
+
+
+time_series_data<-read.csv("basic8_time_series_data.csv")
+
+# create data frame with speaker means by tune for clustering, and make a wide data frame
+
+speaker_means_wide <- time_series_data %>% 
+  group_by(id, normtime, tune) %>% 
+  select(-c(f0,erb,trial_num,)) %>% 
+  summarize(erb_scaled.mean = mean(erb_scaled),.groups="keep") %>% 
+  spread(normtime, erb_scaled.mean)  %>% mutate(id_tune=paste0(id,tune)) ->speaker_means_wide;rm(time_series_data)
+
+
+# run clustering
+library(kml) # this package required
+# set up parameters for clustering
+start <- which(names(speaker_means_wide)=="1")
+end <- which(names(speaker_means_wide)=="30")
+
+
+
+# create object for clustering
+group_cluster_model <- cld(speaker_means_wide, idAll=speaker_means_wide$id_tune, timeInData=start:end, time=c(start:end))
+# run clustering algorithm
+kml(group_cluster_model, nbClusters = 2:10) 
+# inspect solution 
+try(choice(speaker_means_wide))
+#plotAllCriterion(speaker_means_wide)
+
+# add cluster label to trajectory, if desired
+speaker_means_wide$cluster_2<- getClusters(group_cluster_model, 2)
+speaker_means_wide$cluster_5<- getClusters(group_cluster_model, 5)
+speaker_means_wide$cluster_8<- getClusters(group_cluster_model, 8)
+
+
+
+speaker_means_wide %>% gather("normtime","scaled_erb",3:32) %>% 
+  mutate(propdur=as.numeric(normtime)/30)-> cluster_solutions
+
+
+
+cluster_solutions %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
+  ylab("normalised ERB")+ylab("prop. word duration")+
+  geom_line(alpha=0.3)
+ 
+library(ggthemes)
+
+cluster_solutions %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=tune))+
+  scale_color_colorblind()+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(alpha=0.3,size=0.8)  -> traj_colored_by_tune     
+
+
+cluster_solutions %>% 
+  group_by(tune,normtime) %>% 
+  mutate(tunemean=mean(scaled_erb)) %>% 
+  group_by(normtime,id_tune) %>% 
+    mutate(diff_hi = ifelse(scaled_erb > tunemean,scaled_erb,tunemean),
+           diff_lo = ifelse(scaled_erb < tunemean,scaled_erb,tunemean)) -> cluster_solutions
+
+
+
+
+
+
+```
+
+
+## Goals of this talk
+
+#### Conceptual introduction to k-means clustering 
+#### `r fa("seedling", fill = "white")`
+- How it works mechanistically, and considerations for analysis
+- Application to time-series data
+- Example of a study which used the method
+
+```{r, echo = F,message=F, fig.width=7, fig.height=3.75,fig.align='center',fig.show='animate',animation.hook="gifski",interval = 1.2}
+
+
+cluster_solutions %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
+  scale_color_colorblind()+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(alpha=0.1,size=0.8)  -> traj_no_colors
+
+
+cluster_solutions %>% 
+  mutate(cluster=cluster_5) %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(alpha=0.3,size=0.8)+scale_color_ptol()+scale_fill_ptol()-> traj_5_clusters1
+
+cluster_solutions %>% 
+  mutate(cluster=cluster_5) %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(alpha=0.15,size=0.8)+scale_color_ptol()+scale_fill_ptol()+
+    stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.8)-> traj_5_clusters2
+
+leg_5_clust<-get_legend(traj_5_clusters2)
+
+
+plot_grid(traj_no_colors+theme(legend.position = "none"),NULL,rel_widths =c(1,0.2) )
+
+plot_grid(traj_5_clusters1+theme(legend.position = "none"),leg_5_clust,rel_widths =c(1,0.2) )
+
+plot_grid(traj_5_clusters2+theme(legend.position = "none"),leg_5_clust,rel_widths =c(1,0.2) )
+
+
+```
+
+
+## A few first things
+
+
+### `r fa("earth-americas", fill = "steelblue")` This work supported by the NSF (BCS-1944773) 
+### `r fa("github", fill = "steelblue")` Github repository for this code: {INSERT HERE}
+
+This will also eventually be a more fully fleshed out tutorial on https://jsteffman.github.io/teaching.html. 
+
+
+- R package for traditional k-means clustering: Charrad, M., Ghazzali, N., Boiteau, V., Niknafs, A. (2014). NbClust: An R Package for Determining the Relevant Number of Clusters in a Data Set. Journal of Statistical Software, 61(6), 1-36. URL http://www.jstatsoft.org/v61/i06/.
+
+- R package for time-series k-means clustering: Genolini, C., Alacoque, X., Sentenac, M., Arnaud, C. (2015). kml and kml3d: R Packages to Cluster Longitudinal Data. Journal of Statistical Software, 65(4), 1-34. URL http://www.jstatsoft.org/v65/i04/.
+
+- For much more on this data see: Cole, J. & Steffman, J. & Shattuck-Hufnagel, S. & Tilsen, S. (2023) “Hierarchical distinctions in the production and perception of nuclear tunes in American English”, Laboratory Phonology 14(1). doi: https://doi.org/10.16995/labphon.9437 
+
+
+
+
+## Imitative Speech production paradigm
+
+
+### `r fa("headphones", fill = "steelblue")` 3 model utterances heard on a trial, 2 different speakers
+- "She quoted Helena", "He answered Jeremy", "Her name is Marilyn"
+- 8 "nuclear" distinct tunes on the final word, resynthesized F0
+
+### `r fa("microphone-lines", fill = "steelblue")` New, metrically similar, sentence produced 
+- "They honored Melanie", "He modeled harmony", "She remained with Madelyn"
+- Instructions to imitate the melody of the utterance
+
+
+### `r fa("signal", fill = "steelblue")` F0 measures over the final word
+- Here, 30 time-normalised samples, speaker means for each of the 8 stimulus tunes 
+- Converted to ERB and scaled within speaker (normalising speaker F0 level/range differences)
+
+
+## Stimuli and Data
+
+#### What 30 participants heard `r fa("headphones", fill = "steelblue")` (left), and what they produced `r fa("microphone-lines", fill = "steelblue")` (right)
+#### `r fa("seedling", fill = "white")`
+```{r, echo = F,message=F, fig.width=10.5, fig.height=3.5}
+plot_grid(models_f0,NULL,
+traj_colored_by_tune+ theme(legend.position = "none"),
+  nrow=1,rel_widths = c(1,0.05,1))
+
+```
+
+## To begin, k-means in 2D
+
+```{r, echo = F,message=F, fig.width=10, fig.height=3.25}
+tcog_data%>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=tune))+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "right")+
+    ylim(-2,2)+xlim(-2,2)+
+    xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_colorblind() ->tcog_colors
+
+leg_tune<-get_legend(tcog_colors)
+
+plot_grid(traj_colored_by_tune+theme(legend.position = "none"),
+          tcog_colors+theme(legend.position = "none"),leg_tune
+          ,nrow = 1,rel_widths = c(1,1,0.2))
+
+```
+
+#### For llustration, trajectories made 2D, using "Tonal Center of Gravity<footnote content="Barnes, J., Veilleux, N., Brugos, A., & Shattuck-Hufnagel, S. (2012). Tonal Center of Gravity: A global approach to tonal implementation in a level-based intonational phonology. Laboratory Phonology, 3(2), 337-383.">"</footnote>
+
+#### `r fa("seedling", fill = "white")`
+
+
+- *Temporal TCoG*: Roughly, when in normalised time is F0 the highest? Earlier for falls, later for rises
+- *Frequency TCoG*: Here just mean F0 (can be weighted in various ways)
+
+
+
+
+
+## To begin, k-means in 2D
+
+
+```{r, echo = F,message=F, fig.width=10, fig.height=3.25}
+
+tcog_data%>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled))+
+  ylim(-2,2)+xlim(-2,2)+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  geom_point(alpha=0.3,size=2.5)->tcog_no_colors
+
+
+plot_grid(traj_no_colors+theme(legend.position = "none"),
+          tcog_no_colors+theme(legend.position = "none"),NULL
+          ,nrow = 1,rel_widths = c(1,1,0.2))
+
+```
+
+
+
+## k-means in 2D 
+<div style="float: left; width: 25%;">
+#### `r fa("seedling", fill = "seagreen")` Seeds are set 
+#### `r fa("seedling", fill = "white")`
+#### (often at random, though other methods exist)
+#### `r fa("seedling", fill = "white")`
+#### Three chosen here arbitrarily: *the number of seeds will be the number of clusters*
+
+</div>
+
+<div style="float: right; width: 75%;">
+
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+
+
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+
+
+tcog_data %>% filter(paste0(speaker,tune)=="11749LHH"|paste0(speaker,tune)=="15784LLH"|paste0(speaker,tune)=="15781LHL")->seeds
+
+
+tcog_data %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  geom_point(alpha=0.6,size=4,color="gray90")+theme(legend.position = "none")+
+  geom_point(data=seeds,aes(color=speaker),alpha=0.8,size=9,pch=18)+
+    ylim(-2,2)+xlim(-2,2)+
+    scale_color_manual(values=c("red","gold3","blue")) ->seed1;seed1
+
+# order of colors is different here bc colored by speaker
+
+
+```
+
+</div>
+
+## k-means in 2D
+
+<div style="float: left; width: 25%;">
+#### Points are allocated to clusters based on proximity to seeds (Euclidian distance)
+</div>
+
+<div style="float: right; width: 75%;">
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+tcog_data %>% mutate(seed1_tcogt = ifelse(paste0(speaker,tune)=="11749LHH",tcog_t_scaled,0), 
+                     seed2_tcogt = ifelse(paste0(speaker,tune)=="15784LLH",tcog_t_scaled,0),
+                     seed3_tcogt = ifelse(paste0(speaker,tune)=="15781LHL",tcog_t_scaled,0),
+                     seed1_tcogf = ifelse(paste0(speaker,tune)=="11749LHH",tcog_f_scaled,0), 
+                     seed2_tcogf = ifelse(paste0(speaker,tune)=="15784LLH",tcog_f_scaled,0),
+                     seed3_tcogf = ifelse(paste0(speaker,tune)=="15781LHL",tcog_f_scaled,0)) ->  tcog_data
+  
+  
+         tcog_data$seed1_tcogt <- min(tcog_data$seed1_tcogt)
+         tcog_data$seed1_tcogf <- min(tcog_data$seed1_tcogf)
+         tcog_data$seed2_tcogt <- max(tcog_data$seed2_tcogt)
+         tcog_data$seed2_tcogf <- min(tcog_data$seed2_tcogf)
+         tcog_data$seed3_tcogt <- min(tcog_data$seed3_tcogt)
+         tcog_data$seed3_tcogf <- min(tcog_data$seed3_tcogf)  # min used when it is negative
+        
+         tcog_data %>% # compute euclidian distances
+         
+              mutate(euclid_seed_1 = sqrt(((tcog_t_scaled-seed1_tcogt)^2 + (tcog_f_scaled-seed1_tcogf)^2)),
+                     euclid_seed_2 = sqrt(((tcog_t_scaled-seed2_tcogt)^2 + (tcog_f_scaled-seed2_tcogf)^2)),
+                     euclid_seed_3 = sqrt(((tcog_t_scaled-seed3_tcogt)^2 + (tcog_f_scaled-seed3_tcogf)^2))) %>% 
+              mutate(step1_color = ifelse(euclid_seed_1<euclid_seed_2&euclid_seed_1<euclid_seed_3,1,
+                                   ifelse(euclid_seed_2<euclid_seed_1&euclid_seed_2<euclid_seed_3,2,
+                                   ifelse(euclid_seed_3<euclid_seed_1&euclid_seed_3<euclid_seed_2,3,4)))) -> tcog_data
+                     
+ # levels(as.factor(seeds$speaker))
+        
+  seeds %>% group_by(speaker) %>% 
+    mutate(seed_color = ifelse(speaker =="11749",1,
+                       ifelse(speaker =="15781",3,2))) -> seeds
+  
+  
+tcog_data %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step1_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+    ylim(-2,2)+xlim(-2,2)+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(data=seeds,aes(color=as.factor(seed_color)),alpha=0.8,size=9,pch=18)->seed2;seed2
+  
+    
+
+```
+
+</div>
+
+
+
+## k-means in 2D
+
+<div style="float: left; width: 25%;">
+#### Cluster centroids are derived based on this first partition
+</div>
+
+<div style="float: right; width: 75%;">
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+
+
+tcog_data %>% 
+  group_by(step1_color) %>% 
+  mutate(step1_tcogt_mean = mean(tcog_t_scaled),
+         step1_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step1_color),fill=as.factor(step1_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step1_tcogt_mean,step1_tcogf_mean),pch=21,size=6,color="black") ->step1;step1 
+```
+</div>
+
+
+## k-means in 2D
+
+
+<div style="float: left; width: 25%;">
+#### Distance from the centroids is computed, and points are re-allocated 
+</div>
+
+<div style="float: right; width: 75%;">
+
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step2_tcoGt =ifelse(step1_color==1,step1_tcogt_mean,100),
+         centroid2_step2_tcoGt =ifelse(step1_color==2,step1_tcogt_mean,100), 
+         centroid3_step2_tcoGt =ifelse(step1_color==3,step1_tcogt_mean,100), 
+         centroid1_step2_tcoGf =ifelse(step1_color==1,step1_tcogf_mean,100),
+         centroid2_step2_tcoGf =ifelse(step1_color==2,step1_tcogf_mean,100), 
+         centroid3_step2_tcoGf =ifelse(step1_color==3,step1_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step2_tcoGt<-min(tcog_data$centroid1_step2_tcoGt)
+tcog_data$centroid2_step2_tcoGt<-min(tcog_data$centroid2_step2_tcoGt)
+tcog_data$centroid3_step2_tcoGt<-min(tcog_data$centroid3_step2_tcoGt)
+tcog_data$centroid1_step2_tcoGf<-min(tcog_data$centroid1_step2_tcoGf)
+tcog_data$centroid2_step2_tcoGf<-min(tcog_data$centroid2_step2_tcoGf)
+tcog_data$centroid3_step2_tcoGf<-min(tcog_data$centroid3_step2_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step2 = sqrt(((tcog_t_scaled-centroid1_step2_tcoGt)^2 + (tcog_f_scaled-centroid1_step2_tcoGf)^2)),
+                     euclid_centroid_2_step2 = sqrt(((tcog_t_scaled-centroid2_step2_tcoGt)^2 + (tcog_f_scaled-centroid2_step2_tcoGf)^2)),
+                     euclid_centroid_3_step2 = sqrt(((tcog_t_scaled-centroid3_step2_tcoGt)^2 + (tcog_f_scaled-centroid3_step2_tcoGf)^2))) %>% 
+              mutate(step2_color = ifelse(euclid_centroid_1_step2<euclid_centroid_2_step2&euclid_centroid_1_step2<euclid_centroid_3_step2,1,
+ifelse(euclid_centroid_2_step2<euclid_centroid_1_step2&euclid_centroid_2_step2<euclid_centroid_3_step2,2,
+ifelse(euclid_centroid_3_step2<euclid_centroid_1_step2&euclid_centroid_3_step2<euclid_centroid_2_step2,3,4      
+       )))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step2_color) %>% 
+  mutate(step2_tcogt_mean = mean(tcog_t_scaled),
+         step2_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step2_color),fill=as.factor(step2_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step1_tcogt_mean,y=step1_tcogf_mean,fill=as.factor(step1_color)),pch=21,size=6,color="black") ->step2_1;step2_1 
+  
+
+```
+</div>
+
+
+
+## k-means in 2D
+
+
+<div style="float: left; width: 25%;">
+#### New centroids are derived based on re-allocated points
+</div>
+
+<div style="float: right; width: 75%;">
+
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step2_tcoGt =ifelse(step1_color==1,step1_tcogt_mean,100),
+         centroid2_step2_tcoGt =ifelse(step1_color==2,step1_tcogt_mean,100), 
+         centroid3_step2_tcoGt =ifelse(step1_color==3,step1_tcogt_mean,100), 
+         centroid1_step2_tcoGf =ifelse(step1_color==1,step1_tcogf_mean,100),
+         centroid2_step2_tcoGf =ifelse(step1_color==2,step1_tcogf_mean,100), 
+         centroid3_step2_tcoGf =ifelse(step1_color==3,step1_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step2_tcoGt<-min(tcog_data$centroid1_step2_tcoGt)
+tcog_data$centroid2_step2_tcoGt<-min(tcog_data$centroid2_step2_tcoGt)
+tcog_data$centroid3_step2_tcoGt<-min(tcog_data$centroid3_step2_tcoGt)
+tcog_data$centroid1_step2_tcoGf<-min(tcog_data$centroid1_step2_tcoGf)
+tcog_data$centroid2_step2_tcoGf<-min(tcog_data$centroid2_step2_tcoGf)
+tcog_data$centroid3_step2_tcoGf<-min(tcog_data$centroid3_step2_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step2 = sqrt(((tcog_t_scaled-centroid1_step2_tcoGt)^2 + (tcog_f_scaled-centroid1_step2_tcoGf)^2)),
+                     euclid_centroid_2_step2 = sqrt(((tcog_t_scaled-centroid2_step2_tcoGt)^2 + (tcog_f_scaled-centroid2_step2_tcoGf)^2)),
+                     euclid_centroid_3_step2 = sqrt(((tcog_t_scaled-centroid3_step2_tcoGt)^2 + (tcog_f_scaled-centroid3_step2_tcoGf)^2))) %>% 
+              mutate(step2_color = ifelse(euclid_centroid_1_step2<euclid_centroid_2_step2&euclid_centroid_1_step2<euclid_centroid_3_step2,1,
+ifelse(euclid_centroid_2_step2<euclid_centroid_1_step2&euclid_centroid_2_step2<euclid_centroid_3_step2,2,
+ifelse(euclid_centroid_3_step2<euclid_centroid_1_step2&euclid_centroid_3_step2<euclid_centroid_2_step2,3,4      
+       )))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step2_color) %>% 
+  mutate(step2_tcogt_mean = mean(tcog_t_scaled),
+         step2_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step2_color),fill=as.factor(step2_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step2_tcogt_mean,step2_tcogf_mean),pch=21,size=6,color="black") ->step2;step2 
+  
+
+```
+</div>
+
+## k-means in 2D
+
+<div style="float: left; width: 25%;">
+#### And, the process repeats ... 
+</div>
+
+<div style="float: right; width: 75%;">
+
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step3_tcoGt =ifelse(step2_color==1,step2_tcogt_mean,100),
+         centroid2_step3_tcoGt =ifelse(step2_color==2,step2_tcogt_mean,100), 
+         centroid3_step3_tcoGt =ifelse(step2_color==3,step2_tcogt_mean,100), 
+         centroid1_step3_tcoGf =ifelse(step2_color==1,step2_tcogf_mean,100),
+         centroid2_step3_tcoGf =ifelse(step2_color==2,step2_tcogf_mean,100), 
+         centroid3_step3_tcoGf =ifelse(step2_color==3,step2_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step3_tcoGt<-min(tcog_data$centroid1_step3_tcoGt)
+tcog_data$centroid2_step3_tcoGt<-min(tcog_data$centroid2_step3_tcoGt)
+tcog_data$centroid3_step3_tcoGt<-min(tcog_data$centroid3_step3_tcoGt)
+tcog_data$centroid1_step3_tcoGf<-min(tcog_data$centroid1_step3_tcoGf)
+tcog_data$centroid2_step3_tcoGf<-min(tcog_data$centroid2_step3_tcoGf)
+tcog_data$centroid3_step3_tcoGf<-min(tcog_data$centroid3_step3_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step3 = sqrt(((tcog_t_scaled-centroid1_step3_tcoGt)^2 + (tcog_f_scaled-centroid1_step3_tcoGf)^2)),
+                     euclid_centroid_2_step3 = sqrt(((tcog_t_scaled-centroid2_step3_tcoGt)^2 + (tcog_f_scaled-centroid2_step3_tcoGf)^2)),
+                     euclid_centroid_3_step3 = sqrt(((tcog_t_scaled-centroid3_step3_tcoGt)^2 + (tcog_f_scaled-centroid3_step3_tcoGf)^2))) %>% 
+              mutate(step3_color = ifelse(euclid_centroid_1_step3<euclid_centroid_2_step3&euclid_centroid_1_step3<euclid_centroid_3_step3,1,
+ifelse(euclid_centroid_2_step3<euclid_centroid_1_step3&euclid_centroid_2_step3<euclid_centroid_3_step3,2,
+       3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step3_color) %>% 
+  mutate(step3_tcogt_mean = mean(tcog_t_scaled),
+         step3_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step3_color),fill=as.factor(step3_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step2_tcogt_mean,y=step2_tcogf_mean,fill=as.factor(step2_color)),pch=21,size=6,color="black") ->step3_1;step3_1
+
+
+  
+#geom_point(aes(x= step1_tcogt_mean,y=step1_tcogf_mean,fill=as.factor(step1_color)),pch=21,size=6,color="black") ->step2_1;step2_1 
+```
+</div>
+
+
+
+## k-means in 2D
+
+<div style="float: left; width: 25%;">
+#### And, the process repeats ... 
+</div>
+
+<div style="float: right; width: 75%;">
+
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step3_tcoGt =ifelse(step2_color==1,step2_tcogt_mean,100),
+         centroid2_step3_tcoGt =ifelse(step2_color==2,step2_tcogt_mean,100), 
+         centroid3_step3_tcoGt =ifelse(step2_color==3,step2_tcogt_mean,100), 
+         centroid1_step3_tcoGf =ifelse(step2_color==1,step2_tcogf_mean,100),
+         centroid2_step3_tcoGf =ifelse(step2_color==2,step2_tcogf_mean,100), 
+         centroid3_step3_tcoGf =ifelse(step2_color==3,step2_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step3_tcoGt<-min(tcog_data$centroid1_step3_tcoGt)
+tcog_data$centroid2_step3_tcoGt<-min(tcog_data$centroid2_step3_tcoGt)
+tcog_data$centroid3_step3_tcoGt<-min(tcog_data$centroid3_step3_tcoGt)
+tcog_data$centroid1_step3_tcoGf<-min(tcog_data$centroid1_step3_tcoGf)
+tcog_data$centroid2_step3_tcoGf<-min(tcog_data$centroid2_step3_tcoGf)
+tcog_data$centroid3_step3_tcoGf<-min(tcog_data$centroid3_step3_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step3 = sqrt(((tcog_t_scaled-centroid1_step3_tcoGt)^2 + (tcog_f_scaled-centroid1_step3_tcoGf)^2)),
+                     euclid_centroid_2_step3 = sqrt(((tcog_t_scaled-centroid2_step3_tcoGt)^2 + (tcog_f_scaled-centroid2_step3_tcoGf)^2)),
+                     euclid_centroid_3_step3 = sqrt(((tcog_t_scaled-centroid3_step3_tcoGt)^2 + (tcog_f_scaled-centroid3_step3_tcoGf)^2))) %>% 
+              mutate(step3_color = ifelse(euclid_centroid_1_step3<euclid_centroid_2_step3&euclid_centroid_1_step3<euclid_centroid_3_step3,1,
+ifelse(euclid_centroid_2_step3<euclid_centroid_1_step3&euclid_centroid_2_step3<euclid_centroid_3_step3,2,
+       3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step3_color) %>% 
+  mutate(step3_tcogt_mean = mean(tcog_t_scaled),
+         step3_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step3_color),fill=as.factor(step3_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step3_tcogt_mean,step3_tcogf_mean),pch=21,size=6,color="black") ->step3;step3 
+
+```
+</div>
+
+
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step4_tcoGt =ifelse(step3_color==1,step3_tcogt_mean,100),
+         centroid2_step4_tcoGt =ifelse(step3_color==2,step3_tcogt_mean,100), 
+         centroid3_step4_tcoGt =ifelse(step3_color==3,step3_tcogt_mean,100), 
+         centroid1_step4_tcoGf =ifelse(step3_color==1,step3_tcogf_mean,100),
+         centroid2_step4_tcoGf =ifelse(step3_color==2,step3_tcogf_mean,100), 
+         centroid3_step4_tcoGf =ifelse(step3_color==3,step3_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step4_tcoGt<-min(tcog_data$centroid1_step4_tcoGt)
+tcog_data$centroid2_step4_tcoGt<-min(tcog_data$centroid2_step4_tcoGt)
+tcog_data$centroid3_step4_tcoGt<-min(tcog_data$centroid3_step4_tcoGt)
+tcog_data$centroid1_step4_tcoGf<-min(tcog_data$centroid1_step4_tcoGf)
+tcog_data$centroid2_step4_tcoGf<-min(tcog_data$centroid2_step4_tcoGf)
+tcog_data$centroid3_step4_tcoGf<-min(tcog_data$centroid3_step4_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step4 = sqrt(((tcog_t_scaled-centroid1_step4_tcoGt)^2 + (tcog_f_scaled-centroid1_step4_tcoGf)^2)),
+                     euclid_centroid_2_step4 = sqrt(((tcog_t_scaled-centroid2_step4_tcoGt)^2 + (tcog_f_scaled-centroid2_step4_tcoGf)^2)),
+                     euclid_centroid_3_step4 = sqrt(((tcog_t_scaled-centroid3_step4_tcoGt)^2 + (tcog_f_scaled-centroid3_step4_tcoGf)^2))) %>% 
+              mutate(step4_color = ifelse(euclid_centroid_1_step4<euclid_centroid_2_step4&euclid_centroid_1_step4<euclid_centroid_3_step4,1,
+ifelse(euclid_centroid_2_step4<euclid_centroid_1_step4&euclid_centroid_2_step4<euclid_centroid_3_step4,2,
+ifelse(euclid_centroid_3_step4<euclid_centroid_1_step4&euclid_centroid_3_step4<euclid_centroid_2_step4,3,4      
+       )))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step4_color) %>% 
+  mutate(step4_tcogt_mean = mean(tcog_t_scaled),
+         step4_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step4_color),fill=as.factor(step4_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+ geom_point(aes(x= step3_tcogt_mean,y=step3_tcogf_mean,fill=as.factor(step3_color)),pch=21,size=6,color="black") ->step4_1;step4_1
+  
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step4_color),fill=as.factor(step4_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step4_tcogt_mean,step4_tcogf_mean),pch=21,size=6,color="black") ->step4;step4 
+  
+```
+
+
+
+```{r, echo = F,message=F, fig.width=7, fig.height=5, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step5_tcoGt =ifelse(step4_color==1,step4_tcogt_mean,100),
+         centroid2_step5_tcoGt =ifelse(step4_color==2,step4_tcogt_mean,100), 
+         centroid3_step5_tcoGt =ifelse(step4_color==3,step4_tcogt_mean,100), 
+         centroid1_step5_tcoGf =ifelse(step4_color==1,step4_tcogf_mean,100),
+         centroid2_step5_tcoGf =ifelse(step4_color==2,step4_tcogf_mean,100), 
+         centroid3_step5_tcoGf =ifelse(step4_color==3,step4_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step5_tcoGt<-min(tcog_data$centroid1_step5_tcoGt)
+tcog_data$centroid2_step5_tcoGt<-min(tcog_data$centroid2_step5_tcoGt)
+tcog_data$centroid3_step5_tcoGt<-min(tcog_data$centroid3_step5_tcoGt)
+tcog_data$centroid1_step5_tcoGf<-min(tcog_data$centroid1_step5_tcoGf)
+tcog_data$centroid2_step5_tcoGf<-min(tcog_data$centroid2_step5_tcoGf)
+tcog_data$centroid3_step5_tcoGf<-min(tcog_data$centroid3_step5_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step5 = sqrt(((tcog_t_scaled-centroid1_step5_tcoGt)^2 + (tcog_f_scaled-centroid1_step5_tcoGf)^2)),
+                     euclid_centroid_2_step5 = sqrt(((tcog_t_scaled-centroid2_step5_tcoGt)^2 + (tcog_f_scaled-centroid2_step5_tcoGf)^2)),
+                     euclid_centroid_3_step5 = sqrt(((tcog_t_scaled-centroid3_step5_tcoGt)^2 + (tcog_f_scaled-centroid3_step5_tcoGf)^2))) %>% 
+              mutate(step5_color = ifelse(euclid_centroid_1_step5<euclid_centroid_2_step5&euclid_centroid_1_step5<euclid_centroid_3_step5,1,
+ifelse(euclid_centroid_2_step5<euclid_centroid_1_step5&euclid_centroid_2_step5<euclid_centroid_3_step5,2,3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step5_color) %>% 
+  mutate(step5_tcogt_mean = mean(tcog_t_scaled),
+         step5_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step5_color),fill=as.factor(step5_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+geom_point(aes(x= step4_tcogt_mean,y=step4_tcogf_mean,fill=as.factor(step4_color)),pch=21,size=6,color="black") ->step5_1;step5_1
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step5_color),fill=as.factor(step5_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step5_tcogt_mean,step5_tcogf_mean),pch=21,size=6,color="black") ->step5;step5 
+  
+```
+
+
+
+
+```{r, echo = F,message=F, fig.width=7, fig.height=5, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step6_tcoGt =ifelse(step5_color==1,step5_tcogt_mean,100),
+         centroid2_step6_tcoGt =ifelse(step5_color==2,step5_tcogt_mean,100), 
+         centroid3_step6_tcoGt =ifelse(step5_color==3,step5_tcogt_mean,100), 
+         centroid1_step6_tcoGf =ifelse(step5_color==1,step5_tcogf_mean,100),
+         centroid2_step6_tcoGf =ifelse(step5_color==2,step5_tcogf_mean,100), 
+         centroid3_step6_tcoGf =ifelse(step5_color==3,step5_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step6_tcoGt<-min(tcog_data$centroid1_step6_tcoGt)
+tcog_data$centroid2_step6_tcoGt<-min(tcog_data$centroid2_step6_tcoGt)
+tcog_data$centroid3_step6_tcoGt<-min(tcog_data$centroid3_step6_tcoGt)
+tcog_data$centroid1_step6_tcoGf<-min(tcog_data$centroid1_step6_tcoGf)
+tcog_data$centroid2_step6_tcoGf<-min(tcog_data$centroid2_step6_tcoGf)
+tcog_data$centroid3_step6_tcoGf<-min(tcog_data$centroid3_step6_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step6 = sqrt(((tcog_t_scaled-centroid1_step6_tcoGt)^2 + (tcog_f_scaled-centroid1_step6_tcoGf)^2)),
+                     euclid_centroid_2_step6 = sqrt(((tcog_t_scaled-centroid2_step6_tcoGt)^2 + (tcog_f_scaled-centroid2_step6_tcoGf)^2)),
+                     euclid_centroid_3_step6 = sqrt(((tcog_t_scaled-centroid3_step6_tcoGt)^2 + (tcog_f_scaled-centroid3_step6_tcoGf)^2))) %>% 
+              mutate(step6_color = ifelse(euclid_centroid_1_step6<euclid_centroid_2_step6&euclid_centroid_1_step6<euclid_centroid_3_step6,1,
+ifelse(euclid_centroid_2_step6<euclid_centroid_1_step6&euclid_centroid_2_step6<euclid_centroid_3_step6,2,3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step6_color) %>% 
+  mutate(step6_tcogt_mean = mean(tcog_t_scaled),
+         step6_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+tcog_data%>% 
+ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step6_color),fill=as.factor(step6_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+geom_point(aes(x= step5_tcogt_mean,y=step5_tcogf_mean,fill=as.factor(step5_color)),pch=21,size=6,color="black") ->step6_1;step6_1
+
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step6_color),fill=as.factor(step6_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step6_tcogt_mean,step6_tcogf_mean),pch=21,size=6,color="black") ->step6;step6 
+  
+```
+
+
+
+```{r, echo = F,message=F, fig.width=7, fig.height=5, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step7_tcoGt =ifelse(step6_color==1,step6_tcogt_mean,100),
+         centroid2_step7_tcoGt =ifelse(step6_color==2,step6_tcogt_mean,100), 
+         centroid3_step7_tcoGt =ifelse(step6_color==3,step6_tcogt_mean,100), 
+         centroid1_step7_tcoGf =ifelse(step6_color==1,step6_tcogf_mean,100),
+         centroid2_step7_tcoGf =ifelse(step6_color==2,step6_tcogf_mean,100), 
+         centroid3_step7_tcoGf =ifelse(step6_color==3,step6_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step7_tcoGt<-min(tcog_data$centroid1_step7_tcoGt)
+tcog_data$centroid2_step7_tcoGt<-min(tcog_data$centroid2_step7_tcoGt)
+tcog_data$centroid3_step7_tcoGt<-min(tcog_data$centroid3_step7_tcoGt)
+tcog_data$centroid1_step7_tcoGf<-min(tcog_data$centroid1_step7_tcoGf)
+tcog_data$centroid2_step7_tcoGf<-min(tcog_data$centroid2_step7_tcoGf)
+tcog_data$centroid3_step7_tcoGf<-min(tcog_data$centroid3_step7_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step7 = sqrt(((tcog_t_scaled-centroid1_step7_tcoGt)^2 + (tcog_f_scaled-centroid1_step7_tcoGf)^2)),
+                     euclid_centroid_2_step7 = sqrt(((tcog_t_scaled-centroid2_step7_tcoGt)^2 + (tcog_f_scaled-centroid2_step7_tcoGf)^2)),
+                     euclid_centroid_3_step7 = sqrt(((tcog_t_scaled-centroid3_step7_tcoGt)^2 + (tcog_f_scaled-centroid3_step7_tcoGf)^2))) %>% 
+              mutate(step7_color = ifelse(euclid_centroid_1_step7<euclid_centroid_2_step7&euclid_centroid_1_step7<euclid_centroid_3_step7,1,
+ifelse(euclid_centroid_2_step7<euclid_centroid_1_step7&euclid_centroid_2_step7<euclid_centroid_3_step7,2,3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step7_color) %>% 
+  mutate(step7_tcogt_mean = mean(tcog_t_scaled),
+         step7_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step7_color),fill=as.factor(step7_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step6_tcogt_mean,y=step6_tcogf_mean,fill=as.factor(step6_color)),pch=21,size=6,color="black") ->step7_1;step7_1
+
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step7_color),fill=as.factor(step7_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step7_tcogt_mean,step7_tcogf_mean),pch=21,size=6,color="black")->step7;step7 
+  
+```
+
+
+
+
+```{r, echo = F,message=F, fig.width=7, fig.height=5, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step8_tcoGt =ifelse(step7_color==1,step7_tcogt_mean,100),
+         centroid2_step8_tcoGt =ifelse(step7_color==2,step7_tcogt_mean,100), 
+         centroid3_step8_tcoGt =ifelse(step7_color==3,step7_tcogt_mean,100), 
+         centroid1_step8_tcoGf =ifelse(step7_color==1,step7_tcogf_mean,100),
+         centroid2_step8_tcoGf =ifelse(step7_color==2,step7_tcogf_mean,100), 
+         centroid3_step8_tcoGf =ifelse(step7_color==3,step7_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step8_tcoGt<-min(tcog_data$centroid1_step8_tcoGt)
+tcog_data$centroid2_step8_tcoGt<-min(tcog_data$centroid2_step8_tcoGt)
+tcog_data$centroid3_step8_tcoGt<-min(tcog_data$centroid3_step8_tcoGt)
+tcog_data$centroid1_step8_tcoGf<-min(tcog_data$centroid1_step8_tcoGf)
+tcog_data$centroid2_step8_tcoGf<-min(tcog_data$centroid2_step8_tcoGf)
+tcog_data$centroid3_step8_tcoGf<-min(tcog_data$centroid3_step8_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step8 = sqrt(((tcog_t_scaled-centroid1_step8_tcoGt)^2 + (tcog_f_scaled-centroid1_step8_tcoGf)^2)),
+                     euclid_centroid_2_step8 = sqrt(((tcog_t_scaled-centroid2_step8_tcoGt)^2 + (tcog_f_scaled-centroid2_step8_tcoGf)^2)),
+                     euclid_centroid_3_step8 = sqrt(((tcog_t_scaled-centroid3_step8_tcoGt)^2 + (tcog_f_scaled-centroid3_step8_tcoGf)^2))) %>% 
+              mutate(step8_color = ifelse(euclid_centroid_1_step8<euclid_centroid_2_step8&euclid_centroid_1_step8<euclid_centroid_3_step8,1,
+ifelse(euclid_centroid_2_step8<euclid_centroid_1_step8&euclid_centroid_2_step8<euclid_centroid_3_step8,2,3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step8_color) %>% 
+  mutate(step8_tcogt_mean = mean(tcog_t_scaled),
+         step8_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step8_color),fill=as.factor(step8_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step7_tcogt_mean,y=step7_tcogf_mean,fill=as.factor(step7_color)),pch=21,size=6,color="black") ->step8_1;step8_1
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step8_color),fill=as.factor(step8_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step8_tcogt_mean,step8_tcogf_mean),pch=21,size=6,color="black") ->step8;step8
+  
+```
+
+
+
+```{r, echo = F,message=F, fig.width=7, fig.height=5, fig.align='center'}
+
+tcog_data %>% 
+  mutate(centroid1_step9_tcoGt =ifelse(step8_color==1,step8_tcogt_mean,100),
+         centroid2_step9_tcoGt =ifelse(step8_color==2,step8_tcogt_mean,100), 
+         centroid3_step9_tcoGt =ifelse(step8_color==3,step8_tcogt_mean,100), 
+         centroid1_step9_tcoGf =ifelse(step8_color==1,step8_tcogf_mean,100),
+         centroid2_step9_tcoGf =ifelse(step8_color==2,step8_tcogf_mean,100), 
+         centroid3_step9_tcoGf =ifelse(step8_color==3,step8_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step9_tcoGt<-min(tcog_data$centroid1_step9_tcoGt)
+tcog_data$centroid2_step9_tcoGt<-min(tcog_data$centroid2_step9_tcoGt)
+tcog_data$centroid3_step9_tcoGt<-min(tcog_data$centroid3_step9_tcoGt)
+tcog_data$centroid1_step9_tcoGf<-min(tcog_data$centroid1_step9_tcoGf)
+tcog_data$centroid2_step9_tcoGf<-min(tcog_data$centroid2_step9_tcoGf)
+tcog_data$centroid3_step9_tcoGf<-min(tcog_data$centroid3_step9_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step9 = sqrt(((tcog_t_scaled-centroid1_step9_tcoGt)^2 + (tcog_f_scaled-centroid1_step9_tcoGf)^2)),
+                     euclid_centroid_2_step9 = sqrt(((tcog_t_scaled-centroid2_step9_tcoGt)^2 + (tcog_f_scaled-centroid2_step9_tcoGf)^2)),
+                     euclid_centroid_3_step9 = sqrt(((tcog_t_scaled-centroid3_step9_tcoGt)^2 + (tcog_f_scaled-centroid3_step9_tcoGf)^2))) %>% 
+              mutate(step9_color = ifelse(euclid_centroid_1_step9<euclid_centroid_2_step9&euclid_centroid_1_step9<euclid_centroid_3_step9,1,
+ifelse(euclid_centroid_2_step9<euclid_centroid_1_step9&euclid_centroid_2_step9<euclid_centroid_3_step9,2,3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step9_color) %>% 
+  mutate(step9_tcogt_mean = mean(tcog_t_scaled),
+         step9_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step9_color),fill=as.factor(step9_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step8_tcogt_mean,y=step8_tcogf_mean,fill=as.factor(step8_color)),pch=21,size=6,color="black") ->step9_1;step9_1
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step9_color),fill=as.factor(step9_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+  geom_point(aes(x= step9_tcogt_mean,step9_tcogf_mean),pch=21,size=6,color="black")->step9;step9
+  
+```
+
+
+
+
+```{r, echo = F,message=F, fig.width=7, fig.height=5, fig.align='center'}
+# running step10, but not plotting, and all of the steps above.. 
+tcog_data %>% 
+  mutate(centroid1_step10_tcoGt =ifelse(step9_color==1,step9_tcogt_mean,100),
+         centroid2_step10_tcoGt =ifelse(step9_color==2,step9_tcogt_mean,100), 
+         centroid3_step10_tcoGt =ifelse(step9_color==3,step9_tcogt_mean,100), 
+         centroid1_step10_tcoGf =ifelse(step9_color==1,step9_tcogf_mean,100),
+         centroid2_step10_tcoGf =ifelse(step9_color==2,step9_tcogf_mean,100), 
+         centroid3_step10_tcoGf =ifelse(step9_color==3,step9_tcogf_mean,100)) -> tcog_data
+
+tcog_data$centroid1_step10_tcoGt<-min(tcog_data$centroid1_step10_tcoGt)
+tcog_data$centroid2_step10_tcoGt<-min(tcog_data$centroid2_step10_tcoGt)
+tcog_data$centroid3_step10_tcoGt<-min(tcog_data$centroid3_step10_tcoGt)
+tcog_data$centroid1_step10_tcoGf<-min(tcog_data$centroid1_step10_tcoGf)
+tcog_data$centroid2_step10_tcoGf<-min(tcog_data$centroid2_step10_tcoGf)
+tcog_data$centroid3_step10_tcoGf<-min(tcog_data$centroid3_step10_tcoGf)
+        
+tcog_data %>% 
+
+ mutate(euclid_centroid_1_step10 = sqrt(((tcog_t_scaled-centroid1_step10_tcoGt)^2 + (tcog_f_scaled-centroid1_step10_tcoGf)^2)),
+                     euclid_centroid_2_step10 = sqrt(((tcog_t_scaled-centroid2_step10_tcoGt)^2 + (tcog_f_scaled-centroid2_step10_tcoGf)^2)),
+                     euclid_centroid_3_step10 = sqrt(((tcog_t_scaled-centroid3_step10_tcoGt)^2 + (tcog_f_scaled-centroid3_step10_tcoGf)^2))) %>% 
+              mutate(step10_color = ifelse(euclid_centroid_1_step10<euclid_centroid_2_step10&euclid_centroid_1_step10<euclid_centroid_3_step10,1,
+ifelse(euclid_centroid_2_step10<euclid_centroid_1_step10&euclid_centroid_2_step10<euclid_centroid_3_step10,2,3))) -> tcog_data
+
+tcog_data %>% 
+  group_by(step10_color) %>% 
+  mutate(step10_tcogt_mean = mean(tcog_t_scaled),
+         step10_tcogf_mean = mean(tcog_f_scaled)) -> tcog_data 
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step10_color),fill=as.factor(step10_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(aes(x= step9_tcogt_mean,y=step9_tcogf_mean,fill=as.factor(step9_color)),pch=21,size=6,color="black") ->step10_1;step10_1
+
+
+tcog_data %>% 
+         
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(step10_color),fill=as.factor(step10_color)))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+  scale_color_manual(values=c("red","blue","gold3"))+
+  scale_fill_manual(values=c("red","blue","gold3"))+
+  geom_point(alpha=0.3,size=2.5)+theme(legend.position = "none")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(aes(x= step10_tcogt_mean,step10_tcogf_mean),pch=21,size=6,color="black") -> step10
+  
+```
+
+
+
+## k-means in 2D
+<div style="float: left; width: 25%;">
+#### `r fa("check-circle", fill = "green")` Until a solution is converged upon
+#### `r fa("seedling", fill = "white")`
+#### `r fa("scale-balanced", fill = "black")` No more shuffling of points 
+</div>
+
+<div style="float: right; width: 75%;">
+
+
+```{r, echo = F,message=F, fig.width=5.75, fig.height=5.75, fig.align='center',fig.show='animate',animation.hook="gifski",interval = 1}
+seed1
+seed2
+step1
+step2_1
+step2
+step3_1
+step3
+step4_1
+step4
+step5_1
+step5
+step6_1
+step6
+step7_1
+step7
+step8_1
+step8
+step9_1
+step9
+step10_1
+step10
+
+
+```
+
+
+## Many ks, many possible solutions
+#### Cluster solution evaluation and optimization is thus a critical part of analysis
+#### `r fa("seedling", fill = "white")`
+
+```{r, echo = F,message=F, fig.width=9, fig.height=5, fig.align='center'}
+
+
+plot_grid(
+  two_dim_tcog_allsolutions %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(twodim_2clust)))+
+  xlab("")+ylab("")+ggtitle("k = 2")+
+      ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.5,size=2)+theme(legend.position = "none"),
+two_dim_tcog_allsolutions %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(twodim_3clust)))+
+  xlab("")+ylab("")+ggtitle("k = 3")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.5,size=2)+theme(legend.position = "none"),
+two_dim_tcog_allsolutions %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(twodim_4clust)))+
+  xlab("")+ylab("")+ggtitle("k = 4")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.5,size=2)+theme(legend.position = "none"),
+two_dim_tcog_allsolutions %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(twodim_5clust)))+
+  xlab("")+ylab("")+ggtitle("k = 6")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.5,size=2)+theme(legend.position = "none"),
+two_dim_tcog_allsolutions %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(twodim_20clust)))+
+  xlab("")+ylab("")+ggtitle("k = 20")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.5,size=2)+theme(legend.position = "none"),
+two_dim_tcog_allsolutions %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,color=as.factor(twodim_40clust)))+
+  xlab("")+ylab("")+ggtitle("k = 40")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.5,size=2)+theme(legend.position = "none"),nrow=2)
+
+
+```
+
+
+## Cluster evaluation
+
+<div style="float: left; width: 25%;">
+  
+- Various criteria: General intuition is the "best" partition optimizes within and between cluster variance
+  
+- R packages for clustering allow for comparison across multiple criteria, can also evaluate by "majority vote"
+
+- In addition to the "best" k value, others may be of interest as informed by predictions or theory
+  </div>
+
+<div style="float: right; width: 75%;">
+
+
+
+```{r echo=F, fig.align='center', fig.height=5.75, fig.width=6.25, message=F, info = F}
+
+left_join(two_dim_tcog_allsolutions,tcog_data) -> combined_2d_tcog
+#combined_2d_tcog$twodim_2clust
+combined_2d_tcog %>% 
+  mutate(cluster = as.factor(twodim_2clust), tune = as.factor(tune)) %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled,pch=cluster,color=tune))+
+  xlab("")+ylab("")+ggtitle("k = 2 (optimal k value)")+
+  scale_shape_manual(values = c(8,19))+
+  scale_color_colorblind()+
+  ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.5,size=3.5)+theme(legend.position = "right")
+
+```
+
+</div>
+
+## Translating to time series
+
+#### The key difference is in the understanding of DISTANCE between observations, where differences are considered at each time point when comparing two trajectories (L2 norm, or RMSD)
+
+```{r echo=F, fig.align='center', fig.height=4.5, fig.width=9, message=F, info = F}
+ 
+
+plot_grid(
+
+tcog_data %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.6,size=4,color="gray90")+theme(legend.position = "none")+
+    geom_segment(aes(x = 1.16440894390671, y = 1.10057610553143, xend = 0.423859029, yend = 0.135077665), colour = "green3")+
+    geom_segment(aes(x = 1.16440894390671, y = 1.10057610553143, xend = 1.181911244, yend = 0.453075658), colour = "green3")+
+  geom_point(aes(x=1.16440894390671,y=1.10057610553143),pch=21,size=6,color="black",fill="black")+
+  geom_point(aes(x=0.423859029,y=0.135077665),pch=21,size=4,color="black",fill="gray50")+
+    geom_point(aes(x=1.181911244,y=0.453075658),pch=21,size=4,color="black",fill="gray50"),
+  
+NULL, rel_widths = c(1,1))
+
+
+
+
+```
+
+
+
+## Translating to time series
+
+#### The key difference is in the understanding of DISTANCE between observations, where differences are considered at each time point when comparing two trajectories (L2 norm, or RMSD)
+
+```{r echo=F, fig.align='center', fig.height=4.5, fig.width=9, message=F, info = F}
+ 
+
+plot_grid(
+
+tcog_data %>% 
+  ggplot(aes(x=tcog_t_scaled,y=tcog_f_scaled))+
+  xlab("scaled temporal TCoG")+ylab("scaled frequency TCoG")+
+    ylim(-2,2)+xlim(-2,2)+
+  geom_point(alpha=0.6,size=4,color="gray90")+theme(legend.position = "none")+
+    geom_segment(aes(x = 1.16440894390671, y = 1.10057610553143, xend = 0.423859029, yend = 0.135077665), colour = "green3")+
+    geom_segment(aes(x = 1.16440894390671, y = 1.10057610553143, xend = 1.181911244, yend = 0.453075658), colour = "green3")+
+  geom_point(aes(x=1.16440894390671,y=1.10057610553143),pch=21,size=6,color="black",fill="black")+
+  geom_point(aes(x=0.423859029,y=0.135077665),pch=21,size=4,color="black",fill="gray50")+
+    geom_point(aes(x=1.181911244,y=0.453075658),pch=21,size=4,color="black",fill="gray50"),
+  
+
+  cluster_solutions %>% 
+  filter(id_tune=="A24HHL"|id_tune=="A13HHL") %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
+  scale_color_colorblind()+
+  scale_x_continuous(breaks = c(0.25,0.5,0.75))+
+  geom_segment(aes(xend=propdur,y = diff_hi,yend=diff_lo),color="green3")+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(color="gray50",size=1)+facet_wrap(~id,nrow = 2)+ theme(strip.text = element_blank())+
+  geom_line(aes(x=propdur,y=tunemean),size=2), rel_widths = c(1,1))
+
+
+
+
+```
+
+
+
+## Translating to time series
+
+
+```{r echo=F, fig.align='center', fig.height=5.5, fig.width=10, message=F, info = F}
+
+cluster_solutions %>%  
+  mutate(diff_from_mean = scaled_erb - tunemean) %>% 
+  group_by(paste(id,tune)) %>% 
+  mutate(rmsd =  sqrt(sum(diff_from_mean^2))/30) -> cluster_solutions
+  
+library(viridis)
+
+  cluster_solutions %>% 
+  filter(tune=="LLH") %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
+  scale_color_colorblind()+
+  geom_segment(aes(xend=propdur,y = diff_hi,yend=diff_lo,color=rmsd))+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+scale_color_viridis(option = "D",end = 0.9,begin=0.3)+
+  scale_x_continuous(breaks = c(0,0.25,0.5,0.75,1))+
+      scale_y_continuous(breaks = c(-1,0,1))+
+  geom_line(color="gray50",size=0.8)+facet_wrap(~paste(rmsd,id))+ theme(strip.text = element_blank(),legend.position = "none", axis.text.x=element_blank(),
+  axis.text.y=element_blank())+
+  geom_line(aes(x=propdur,y=tunemean),size=1)
+
+```
+
+
+## Application to the data 
+
+#### In the data set, *five* was selected as the optimal number of clusters
+#### `r fa("seedling", fill = "white")`
+
+- Caliński Harabasz criterion, in agreement with others 
+
+
+```{r, echo = F,message=F, fig.width=7.5, fig.height=4.5,fig.show='animate',animation.hook="gifski",interval = 1.5}
+
+
+
+plot_grid(traj_no_colors+ggtitle("input")+theme(legend.position = "none"),NULL,rel_widths =c(1,0.2) )
+
+plot_grid(traj_5_clusters1+ggtitle("output, k=5")+theme(legend.position = "none"),leg_5_clust,rel_widths =c(1,0.2) )
+
+plot_grid(traj_5_clusters2+ggtitle("output, k=5")+theme(legend.position = "none"),leg_5_clust,rel_widths =c(1,0.2) )
+
+# plot_grid(traj_no_colors+ggtitle("input")+theme(legend.position = "none"),
+#           traj_5_clusters+ggtitle("output, k=5")+theme(legend.position = "none"),leg_5_clust
+#           ,nrow = 1,rel_widths = c(1,1,0.2))
+
+```
+
+
+## Application to the data 
+
+
+```{r, echo = F,message=F, fig.width=10, fig.height=3.5}
+xtabs(~tune+cluster_5, cluster_solutions) -> heatmap_table5
+heatmap_table5 <- data.frame(heatmap_table5)
+heatmap_table5$tune <- toupper(heatmap_table5$tune)
+heatmap_table5$proptune<-heatmap_table5$Freq/900
+
+heatmap_table5 %>% 
+mutate(proptune=ifelse(proptune=="0",NA,proptune)) %>% 
+filter(Freq!=0) %>% 
+ggplot(aes(x=cluster_5,y=tune,fill=Freq))+
+  #scale_fill_continuous(breaks=c(0,0.5,1))+
+  geom_tile()+xlab("cluster")+labs(fill="proportion of tunes")+
+  #ggtitle("proportion tunes per cluster")+
+  geom_text(aes(label = round(proptune, 2),color=proptune),size=3)+
+  scale_fill_viridis(option = "mako",direction = -1)+
+  scale_color_viridis(direction = 1,option="A")+
+  theme(legend.position = "none") -> heatmap_plot5
+
+plot_grid(heatmap_plot5,
+          traj_5_clusters2+theme(legend.position = "none"),leg_5_clust
+          ,nrow = 1,rel_widths = c(1,1,0.2))
+
+
+
+```
+
+## We can also consider other clustering solutions
+
+```{r, echo = F,message=F, fig.width=10, fig.height=5.5}
+
+xtabs(~tune+cluster_2, cluster_solutions) -> heatmap_table2
+heatmap_table2 <- data.frame(heatmap_table2)
+heatmap_table2$tune <- toupper(heatmap_table2$tune)
+heatmap_table2$proptune<-heatmap_table2$Freq/900
+
+heatmap_table2 %>% 
+mutate(proptune=ifelse(proptune=="0",NA,proptune)) %>% 
+filter(Freq!=0) %>% 
+ggplot(aes(x=cluster_2,y=tune,fill=Freq))+
+  #scale_fill_continuous(breaks=c(0,0.2,1))+
+  geom_tile()+xlab("cluster")+labs(fill="proportion of tunes")+
+  #ggtitle("proportion tunes per cluster")+
+  geom_text(aes(label = round(proptune, 2),color=proptune),size=3)+
+  scale_fill_viridis(option = "mako",direction = -1)+
+  scale_color_viridis(direction = 1,option="A")+
+  theme(legend.position = "none",axis.title.x = element_blank(),axis.title.y = element_blank())-> heatmap_plot2
+
+
+
+xtabs(~tune+cluster_8, cluster_solutions) -> heatmap_table8
+heatmap_table8 <- data.frame(heatmap_table8)
+heatmap_table8$tune <- toupper(heatmap_table8$tune)
+heatmap_table8$proptune<-heatmap_table8$Freq/900
+
+heatmap_table8 %>% 
+mutate(proptune=ifelse(proptune=="0",NA,proptune)) %>% 
+filter(Freq!=0) %>% 
+ggplot(aes(x=cluster_8,y=tune,fill=Freq))+
+  #scale_fill_continuous(breaks=c(0,0.8,1))+
+  geom_tile()+xlab("cluster")+labs(fill="proportion of tunes")+
+  #ggtitle("proportion tunes per cluster")+
+  geom_text(aes(label = round(proptune, 2),color=proptune),size=3)+
+  scale_fill_viridis(option = "mako",direction = -1)+
+  scale_color_viridis(direction = 1,option="A")+
+  
+  theme(legend.position = "none",axis.title.x = element_blank(),axis.title.y = element_blank()) -> heatmap_plot8
+
+
+
+cluster_solutions %>% 
+  mutate(cluster=cluster_2) %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+    theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
+
+  geom_line(alpha=0.2,size=0.8)+scale_color_ptol()+scale_fill_ptol()+
+    stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.5) -> traj_2_clusters
+
+cluster_solutions %>% 
+  mutate(cluster=cluster_8) %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(alpha=0.1,size=0.7)+scale_color_ptol()+scale_fill_ptol()+
+  theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
+    stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=1.5)+facet_wrap(~cluster,nrow=2) -> traj_8_clusters
+
+
+
+plot_grid(
+          traj_2_clusters+theme(legend.position = "none")+ggtitle("k=2"),
+         NULL,
+          heatmap_plot2,
+          NULL, nrow=2,rel_widths = c(1,2,1,2),
+          rel_heights = c(1,0.65,1,0.65))
+
+```
+
+
+
+## We can also consider other clustering solutions
+
+```{r, echo = F,message=F, fig.width=10, fig.height=5.5}
+
+
+plot_grid(
+          traj_2_clusters+theme(legend.position = "none")+ggtitle("k=2"),
+          traj_8_clusters+theme(legend.position = "none")+ggtitle("k=8"),
+          heatmap_plot2,
+          heatmap_plot8, nrow=2,rel_widths = c(1,2,1,2),
+          rel_heights = c(1,0.65,1,0.65))
+
+```
+
+
+
+
+## Individual variation 
+
+```{r, echo = F,message=F, fig.width=9, fig.height=3.5}
+
+combined_indv_clusters<-read.delim("combined_indv_clusters.csv", sep=",")
+
+indv_clusters_traj<-read.delim("indvidualclust_data.csv", sep=",")
+
+histplot<- data.frame(
+  cluster=c(7,6,5,5,5,5,5,4,4,4,4,4,4,3,3,
+            2,2,2,2,2,2,2,2,2,2,2,2,2,2,2))
+
+ggplot(histplot,aes(x=cluster))+
+  stat_bin(binwidth=1,fill="steelblue",color="steelblue",alpha=1) +
+  xlab("optimal number of clusters")+
+  ylim(0,16)+
+  ylab("number of speakers")+
+  #stat_bin(binwidth=1, geom="text", aes(label=..count..), vjust=1.3,color="white")+
+  scale_x_continuous(breaks=c(1,2,3,4,5,6,7)) ->histogram
+
+library(infotheo)
+
+indv_clusters_traj %>% 
+  group_by(id) %>% 
+  mutate(mi =mutinformation(tune,clusters,method="emp" )) %>% slice(1) -> summary
+
+summary %>% 
+  ggplot(aes(y=mi,x=number_clusters))+
+  geom_point(aes(size=mi,color=mi))+
+  xlab("optimal number of clusters")+
+  ylab("mutual information index")+
+  scale_color_viridis()+theme(legend.position = "none")+
+  stat_smooth(method="lm",se=F,color="black",lty=2) -> mi_plot
+
+plot_grid(histogram,mi_plot)
+
+```
+
+#### Individual clustering solutions can become the object of analysis
+- Potentially related to group or individual characteristics
+- At left, a histogram showing individual level variation in terms of optimal k
+- At right, the relationship between this number and mutual information: i.e. the predictability of the relationship between stimulus tunes and clusters
+
+
+
+## Individual variation 
+```{r, echo = F,message=F, fig.width=9, fig.height=5.6}
+# individual cluster heat maps 
+# 
+
+combined_indv_clusters %>%
+  mutate(clusters = ifelse(id =="A7"& clusters=="A","B",
+                    ifelse(id =="A7"& clusters=="B","A",
+                    ifelse(id =="A18"& clusters=="A","B",
+                    ifelse(id =="A18"& clusters=="B","A",
+                    ifelse(id =="A11"& clusters=="A","B",
+                    ifelse(id =="A11"& clusters=="B","A",
+                    ifelse(id =="A22"& clusters=="A","B",
+                    ifelse(id =="A22"& clusters=="B","A",
+                       clusters))))))))) %>%
+  filter(Freq!=0) %>%
+  ggplot(aes(x= clusters,y=toupper(tune), fill= prop))+
+  scale_fill_viridis()+
+  theme_cowplot(10)+
+  labs(fill="proportion of\ntunes in clusters")+
+  theme(legend.position = "right",axis.title =element_blank(),strip.text = element_blank())+
+  scale_fill_viridis(option = "mako",direction = -1)+
+  scale_color_viridis(direction = 1,option="A")+
+  geom_tile() +facet_wrap(~paste(nclust,id),scales="free_x") -> all_clusters
+
+
+all_clusters
+
+
+```
+
+
+## k-means (left) vs. hierarchical clustering (right)
+
+
+```{r, echo = F,message=F, fig.width=10, fig.height=3.75, fig.show='animate',animation.hook="gifski",interval = 2}
+
+## read in and plot hierarchical clustering data 
+
+hc<-read.csv("hierarchical-clustering.csv")
+
+
+hc %>% select(-start,-end,-filename) -> hc
+  
+colnames(hc)<-c("id_tune",1:30,"cluster")
+
+hc %>% gather("normtime","scaled_erb",2:31) %>% 
+  mutate(normtime= as.numeric(normtime)) -> hc
+
+
+hc %>% 
+  mutate(cluster= as.factor(cluster)) %>% 
+  ggplot(aes(x= normtime/30,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(alpha=0.3,size=0.8)+scale_color_calc()-> traj_5_clusters1hc
+
+hc %>% 
+  mutate(cluster= as.factor(cluster)) %>% 
+  ggplot(aes(x= normtime/30,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+  ylab("normalised ERB")+xlab("prop. word duration")+
+  geom_line(alpha=0.15,size=0.8)+scale_color_calc()+scale_fill_calc()+
+    stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.8)-> traj_5_clusters2hc
+
+
+plot_grid(traj_no_colors+theme(legend.position = "none"),
+          traj_no_colors+theme(legend.position = "none"),nrow = 1)
+
+plot_grid(traj_5_clusters1+theme(legend.position = "none"),
+          traj_5_clusters1hc+theme(legend.position = "none"),nrow = 1)
+
+plot_grid(traj_5_clusters2+theme(legend.position = "none"),
+          traj_5_clusters2hc+theme(legend.position = "none"),nrow = 1)
+
+```
+
+
+
+
+## Concluding remarks
+
+### K-means offers a fairly intuitive way of assessing groupings in data
+- And is easily implemented for time series data
+- Robust to outliers
+- Tests of different numbers of k can be interweaved with domain knowledge or predictions
+
+### There are however, crucial considerations
+
+- Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
+- This makes k selection, and optimization a crucial part of the k-means workflow
+- This can happen all "under the hood" in R, with various degrees of researcher intervention
+#### 
+- Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
+
+
+
+## Concluding remarks
+
+### K-means offers a fairly intuitive way of assessing groupings in data
+- And is easily implemented for time series data
+- Robust to outliers
+- Tests of different numbers of k can be interweaved with domain knowledge or predictions
+
+### There are however, crucial considerations
+
+- Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
+- This makes k selection, and optimization a crucial part of the k-means workflow
+- This can happen all "under the hood" in R, with various degrees of researcher intervention
+#### 
+- Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
+
+### `r fa("user-check", fill = "steelblue")` Thank you! 
