@@ -237,12 +237,12 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),leg_5_clust,rel_width
 ## A few first things
 
 
-### `r fa("earth-americas", fill = "steelblue")` This work supported by the NSF (BCS-1944773, PI Jennifer Cole) 
+### `r fa("earth-americas", fill = "steelblue")` This work supported by the NSF (BCS-1944773) 
 ### `r fa("github", fill = "steelblue")` Repository: https://github.com/jsteffman/k-means-clustering
 
 This will also eventually (...) be a tutorial on https://jsteffman.github.io/teaching.html. 
 
-
+#### `r fa("seedling", fill = "white")`
 - R package for traditional k-means clustering: Charrad, M., Ghazzali, N., Boiteau, V., Niknafs, A. (2014). NbClust: An R Package for Determining the Relevant Number of Clusters in a Data Set. Journal of Statistical Software, 61(6), 1-36. URL http://www.jstatsoft.org/v61/i06/.
 
 - R package for time-series k-means clustering: Genolini, C., Alacoque, X., Sentenac, M., Arnaud, C. (2015). kml and kml3d: R Packages to Cluster Longitudinal Data. Journal of Statistical Software, 65(4), 1-34. URL http://www.jstatsoft.org/v65/i04/.
@@ -373,7 +373,7 @@ tcog_data %>%
 ## k-means in 2D
 
 <div style="float: left; width: 25%;">
-#### Points are allocated to clusters based on proximity to seeds (Euclidian distance)
+#### Points are allocated to clusters based on proximity to seeds (often Euclidian distance)
 </div>
 
 <div style="float: right; width: 75%;">
@@ -1167,7 +1167,7 @@ two_dim_tcog_allsolutions %>%
 ```
 
 
-## Cluster evaluation
+## Selecting the optimal k value
 
 <div style="float: left; width: 25%;">
   
@@ -1175,7 +1175,28 @@ two_dim_tcog_allsolutions %>%
   
 - R packages for clustering allow for comparison across multiple criteria, can also evaluate by "majority vote"
 
-- In addition to the "best" k value, others may be of interest as informed by predictions or theory
+- In addition to this "best" k value, others may be of interest as informed by predictions or theory
+  </div>
+
+<div style="float: right; width: 75%;">
+
+
+
+
+
+
+</div>
+
+
+## Selecting the optimal k value
+
+<div style="float: left; width: 25%;">
+  
+- Various criteria: General intuition is the "best" partition optimizes within and between cluster variance
+  
+- R packages for clustering allow for comparison across multiple criteria, can also evaluate by "majority vote"
+
+- In addition to this "best" k value, others may be of interest as informed by predictions or theory
   </div>
 
 <div style="float: right; width: 75%;">
@@ -1199,9 +1220,13 @@ combined_2d_tcog %>%
 
 </div>
 
+
+
+
 ## Translating to time series
 
-#### The key difference is in the understanding of DISTANCE between observations, where differences are considered at each time point when comparing two trajectories (L2 norm, or RMSD)
+#### The key difference is in the understanding of DISTANCE, where distances are considered at each time point when comparing two trajectories 
+
 
 ```{r echo=F, fig.align='center', fig.height=4.5, fig.width=9, message=F, info = F}
  
@@ -1228,9 +1253,10 @@ NULL, rel_widths = c(1,1))
 
 
 
+
 ## Translating to time series
 
-#### The key difference is in the understanding of DISTANCE between observations, where differences are considered at each time point when comparing two trajectories (L2 norm, or RMSD)
+#### The key difference is in the understanding of DISTANCE, where distances are considered at each time point when comparing two trajectories 
 
 ```{r echo=F, fig.align='center', fig.height=4.5, fig.width=9, message=F, info = F}
  
@@ -1299,8 +1325,6 @@ scale_color_viridis(option = "D",end = 0.9,begin=0.3)+
 #### In the data set, *five* was selected as the optimal number of clusters
 #### `r fa("seedling", fill = "white")`
 
-- Caliński Harabasz criterion, in agreement with others 
-
 
 ```{r, echo = F,message=F, fig.width=7.5, fig.height=4.5,fig.show='animate',animation.hook="gifski",interval = 1.5}
 
@@ -1319,7 +1343,7 @@ plot_grid(traj_5_clusters2+ggtitle("output, k=5")+theme(legend.position = "none"
 ```
 
 
-## Application to the data 
+## Consdering stimulus-cluster relationships
 
 
 ```{r, echo = F,message=F, fig.width=10, fig.height=3.5}
@@ -1572,7 +1596,7 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),
 
 - Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
 - This makes k selection, and optimization a crucial part of the k-means workflow
-- This can happen all "under the hood" in R, with various degrees of researcher intervention
+* This can happen all "under the hood" in R, with various degrees of researcher intervention
 - Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
 
 
