@@ -2,7 +2,7 @@
 title: "K-means clustering <br> for time-series data"
 subtitle: "An illustration with Intonational Tunes"
 author: "Jeremy Steffman ~ The University of Edinburgh"
-date: "9 November, 2023"
+date: "10 November, 2023"
 output: 
   ioslides_presentation:
     css: style2.css
@@ -160,6 +160,8 @@ speaker_means_wide %>% gather("normtime","scaled_erb",3:32) %>%
   mutate(propdur=as.numeric(normtime)/30)-> cluster_solutions
 
 
+cluster_solutions$id_tune
+
 
 cluster_solutions %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
@@ -171,6 +173,7 @@ library(ggthemes)
 cluster_solutions %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=tune))+
   scale_color_colorblind()+
+   ylim(-2.25,2.8)+
   ylab("normalised ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.3,size=0.8)  -> traj_colored_by_tune     
 
@@ -205,6 +208,7 @@ cluster_solutions %>%
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
   scale_color_colorblind()+
   ylab("normalised ERB")+xlab("prop. word duration")+
+  ylim(-2.25,2.8)+
   geom_line(alpha=0.1,size=0.8)  -> traj_no_colors
 
 
@@ -212,6 +216,7 @@ cluster_solutions %>%
   mutate(cluster=cluster_5) %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
   ylab("normalised ERB")+xlab("prop. word duration")+
+  ylim(-2.25,2.8)+
   geom_line(alpha=0.3,size=0.8)+scale_color_ptol()+scale_fill_ptol()-> traj_5_clusters1
 
 cluster_solutions %>% 
@@ -219,6 +224,7 @@ cluster_solutions %>%
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
   ylab("normalised ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.15,size=0.8)+scale_color_ptol()+scale_fill_ptol()+
+    ylim(-2.25,2.8)+
     stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.8)-> traj_5_clusters2
 
 leg_5_clust<-get_legend(traj_5_clusters2)
@@ -1422,6 +1428,7 @@ cluster_solutions %>%
     theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
 
   geom_line(alpha=0.2,size=0.8)+scale_color_ptol()+scale_fill_ptol()+
+    ylim(-2.25,2.8)+
     stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.5) -> traj_2_clusters
 
 cluster_solutions %>% 
@@ -1429,6 +1436,7 @@ cluster_solutions %>%
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
   ylab("normalised ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.1,size=0.7)+scale_color_ptol()+scale_fill_ptol()+
+  ylim(-2.25,2.8)+
   theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
     stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=1.5)+facet_wrap(~cluster,nrow=2) -> traj_8_clusters
 
@@ -1549,25 +1557,27 @@ all_clusters
 hc<-read.csv("hierarchical-clustering.csv")
 
 
-hc %>% select(-start,-end,-filename) -> hc
-  
-colnames(hc)<-c("id_tune",1:30,"cluster")
-
-hc %>% gather("normtime","scaled_erb",2:31) %>% 
-  mutate(normtime= as.numeric(normtime)) -> hc
+hc %>% mutate(id_tune = toupper(str_replace(interval_label,"_","")),
+              hc_cluster = cluster) %>% 
+  select(hc_cluster,id_tune) -> hc
 
 
-hc %>% 
-  mutate(cluster= as.factor(cluster)) %>% 
-  ggplot(aes(x= normtime/30,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+left_join(cluster_solutions,hc) -> cluster_solutions
+
+
+cluster_solutions %>% 
+  mutate(cluster= as.factor(hc_cluster)) %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
   ylab("normalised ERB")+xlab("prop. word duration")+
+  ylim(-2.25,2.8)+
   geom_line(alpha=0.3,size=0.8)+scale_color_calc()-> traj_5_clusters1hc
 
-hc %>% 
-  mutate(cluster= as.factor(cluster)) %>% 
-  ggplot(aes(x= normtime/30,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
+cluster_solutions %>% 
+  mutate(cluster= as.factor(hc_cluster)) %>% 
+  ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
   ylab("normalised ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.15,size=0.8)+scale_color_calc()+scale_fill_calc()+
+  ylim(-2.25,2.8)+
     stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.8)-> traj_5_clusters2hc
 
 
@@ -1603,15 +1613,15 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),
 ## Concluding remarks
 
 ### `r fa("check", fill = "steelblue")` K-means offers a fairly intuitive way of assessing groupings in data
-- And is easily implemented for time series data
-- Robust to outliers
-- Tests of different numbers of k can be interweaved with domain knowledge or predictions
+* And is easily implemented for time series data
+* Robust to outliers
+* Tests of different numbers of k can be interweaved with domain knowledge or predictions
 
 ### `r fa("bell", fill = "steelblue")` There are however, crucial considerations
 
-- Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
-- This makes k selection, and optimization a crucial part of the k-means workflow
+* Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
+* This makes k selection, and optimization a crucial part of the k-means workflow
 - This can happen all "under the hood" in R, with various degrees of researcher intervention
-- Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
+* Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
 
 ### `r fa("user-check", fill = "steelblue")` Thank you! 
