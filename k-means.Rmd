@@ -1614,14 +1614,15 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),
 
 ### `r fa("check", fill = "steelblue")` K-means offers a fairly intuitive way of assessing groupings in data
 * And is easily implemented for time series data
-* Robust to outliers
 * Tests of different numbers of k can be interweaved with domain knowledge or predictions
+* Robust to outliers, easy to test with a range of k values
+
 
 ### `r fa("bell", fill = "steelblue")` There are however, crucial considerations
 
 * Unlike hierarchical clustering, for which a single dendrogram can be "cut" in different locations to yield different numbers of clusters, k-means offers many possible solutions based on the range of k's tested
 * This makes k selection, and optimization a crucial part of the k-means workflow
-- This can happen all "under the hood" in R, with various degrees of researcher intervention
+<tab><tab>+ This can happen all "under the hood" in R, with various degrees of researcher intervention
 * Other considerations are shared between the methods: normalisation/scaling, distance measures, etc. 
 
 ### `r fa("user-check", fill = "steelblue")` Thank you! 
