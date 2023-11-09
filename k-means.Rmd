@@ -1179,7 +1179,7 @@ two_dim_tcog_allsolutions %>%
   
 - Various criteria: General intuition is the "best" partition optimizes within and between cluster variance
   
-- R packages for clustering allow for comparison across multiple criteria, can also evaluate by "majority vote"
+- R packages allow for comparison across multiple criteria, can also evaluate by "majority vote"
 
 - In addition to this "best" k value, others may be of interest as informed by predictions or theory
   </div>
@@ -1200,7 +1200,7 @@ two_dim_tcog_allsolutions %>%
   
 - Various criteria: General intuition is the "best" partition optimizes within and between cluster variance
   
-- R packages for clustering allow for comparison across multiple criteria, can also evaluate by "majority vote"
+- R packages allow for comparison across multiple criteria, can also evaluate by "majority vote"
 
 - In addition to this "best" k value, others may be of interest as informed by predictions or theory
   </div>
