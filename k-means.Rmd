@@ -1289,7 +1289,7 @@ tcog_data %>%
   scale_x_continuous(breaks = c(0.25,0.5,0.75))+
   geom_segment(aes(xend=propdur,y = diff_hi,yend=diff_lo),color="green3")+
   ylab("normalised ERB")+xlab("prop. word duration")+
-  geom_line(color="gray50",size=1)+facet_wrap(~id,nrow = 2)+ theme(strip.text = element_blank())+
+  geom_line(color="gray40",size=0.9,lty=2)+facet_wrap(~id,nrow = 2)+ theme(strip.text = element_blank())+
   geom_line(aes(x=propdur,y=tunemean),size=2), rel_widths = c(1,1))
 
 
@@ -1320,7 +1320,7 @@ library(viridis)
 scale_color_viridis(option = "D",end = 0.9,begin=0.3)+
   scale_x_continuous(breaks = c(0,0.25,0.5,0.75,1))+
       scale_y_continuous(breaks = c(-1,0,1))+
-  geom_line(color="gray50",size=0.8)+facet_wrap(~paste(rmsd,id))+ theme(strip.text = element_blank(),legend.position = "none", axis.text.x=element_blank(),
+  geom_line(color="gray40",size=0.8,lty=2)+facet_wrap(~paste(rmsd,id))+ theme(strip.text = element_blank(),legend.position = "none", axis.text.x=element_blank(),
   axis.text.y=element_blank())+
   geom_line(aes(x=propdur,y=tunemean),size=1)
 
@@ -1379,7 +1379,7 @@ plot_grid(heatmap_plot5,
 
 ```
 
-## We can also consider other clustering solutions
+## Other clustering solutions
 
 ```{r, echo = F,message=F, fig.width=10, fig.height=5.5}
 
@@ -1509,10 +1509,10 @@ plot_grid(histogram,mi_plot)
 
 ```
 
-#### Individual clustering solutions can become the object of analysis
+#### Individual speaker clustering solutions can become the object of analysis
 - Potentially related to group or individual characteristics
-- At left, a histogram showing individual level variation in terms of optimal k
-- At right, the relationship between this number and mutual information: i.e. the predictability of the relationship between stimulus tunes and clusters
+- At left, a histogram showing variation in terms of optimal k
+- At right, the relationship between this number and mutual information: i.e. the predictive strength of the relationship between stimulus tunes and clusters
 
 
 
