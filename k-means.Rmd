@@ -5,6 +5,7 @@ author: "Jeremy Steffman ~ The University of Edinburgh"
 date: "10 November, 2023"
 output: 
   ioslides_presentation:
+    transition: slower
     css: style2.css
     smaller: true
     widescreen: true
@@ -1332,7 +1333,7 @@ scale_color_viridis(option = "D",end = 0.9,begin=0.3)+
 #### `r fa("seedling", fill = "white")`
 
 
-```{r, echo = F,message=F, fig.width=7.5, fig.height=4.5,fig.show='animate',animation.hook="gifski",interval = 1.5}
+```{r, echo = F,message=F, fig.width=7.5, fig.height=4.5,fig.show='animate',animation.hook="gifski",interval = 1.75}
 
 
 
