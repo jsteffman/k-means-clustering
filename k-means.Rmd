@@ -1454,7 +1454,7 @@ plot_grid(
 
 
 
-## We can also consider other clustering solutions
+## Other clustering solutions
 
 ```{r, echo = F,message=F, fig.width=10, fig.height=5.5}
 
