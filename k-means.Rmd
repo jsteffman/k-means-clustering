@@ -140,8 +140,6 @@ library(kml) # this package required
 start <- which(names(speaker_means_wide)=="1")
 end <- which(names(speaker_means_wide)=="30")
 
-
-
 # create object for clustering
 group_cluster_model <- cld(speaker_means_wide, idAll=speaker_means_wide$id_tune, timeInData=start:end, time=c(start:end))
 # run clustering algorithm
@@ -247,7 +245,7 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),leg_5_clust,rel_width
 ### `r fa("earth-americas", fill = "steelblue")` This work supported by the NSF (BCS-1944773) 
 ### `r fa("github", fill = "steelblue")` Repository: https://github.com/jsteffman/k-means-clustering
 
-This will also eventually (...) be a tutorial on https://jsteffman.github.io/teaching.html 
+- This will also eventually (...) be a tutorial on https://jsteffman.github.io/teaching.html 
 
 #### `r fa("seedling", fill = "white")`
 - For much more on this data see: Cole, J. & Steffman, J. & Shattuck-Hufnagel, S. & Tilsen, S. (2023) “Hierarchical distinctions in the production and perception of nuclear tunes in American English”, Laboratory Phonology 14(1). doi: https://doi.org/10.16995/labphon.9437
