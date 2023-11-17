@@ -2,10 +2,10 @@
 title: "K-means clustering <br> for time-series data"
 subtitle: "An illustration with Intonational Tunes"
 author: "Jeremy Steffman ~ The University of Edinburgh"
-date: "10 November, 2023"
+date: ""
 output: 
   ioslides_presentation:
-    transition: slower
+    transition: faster
     css: style2.css
     smaller: true
     widescreen: true
@@ -164,7 +164,7 @@ cluster_solutions$id_tune
 
 cluster_solutions %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
-  ylab("normalised ERB")+ylab("prop. word duration")+
+  ylab("scaled ERB")+ylab("prop. word duration")+
   geom_line(alpha=0.3)
  
 library(ggthemes)
@@ -173,7 +173,7 @@ cluster_solutions %>%
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=tune))+
   scale_color_colorblind()+
    ylim(-2.25,2.8)+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.3,size=0.8)  -> traj_colored_by_tune     
 
 
@@ -206,7 +206,7 @@ cluster_solutions %>%
 cluster_solutions %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
   scale_color_colorblind()+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   ylim(-2.25,2.8)+
   geom_line(alpha=0.1,size=0.8)  -> traj_no_colors
 
@@ -214,14 +214,14 @@ cluster_solutions %>%
 cluster_solutions %>% 
   mutate(cluster=cluster_5) %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   ylim(-2.25,2.8)+
   geom_line(alpha=0.3,size=0.8)+scale_color_ptol()+scale_fill_ptol()-> traj_5_clusters1
 
 cluster_solutions %>% 
   mutate(cluster=cluster_5) %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.15,size=0.8)+scale_color_ptol()+scale_fill_ptol()+
     ylim(-2.25,2.8)+
     stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.8)-> traj_5_clusters2
@@ -274,7 +274,7 @@ plot_grid(traj_5_clusters2+theme(legend.position = "none"),leg_5_clust,rel_width
 
 
 ### `r fa("signal", fill = "steelblue")` F0 measures over the final word
-- Here, 30 time-normalised samples, speaker means for each of the 8 stimulus tunes (8 trajectories per speaker, 240 total)
+- Here, 30 time-scaled samples, speaker means for each of the 8 stimulus tunes (8 trajectories per speaker, 240 total)
 - Converted to ERB and scaled within speaker (normalising speaker F0 level/range differences)
 
 
@@ -312,7 +312,7 @@ plot_grid(traj_colored_by_tune+theme(legend.position = "none"),
 #### `r fa("seedling", fill = "white")`
 
 
-- *Temporal TCoG*: Roughly, when in normalised time is F0 the highest? Earlier for falls, later for rises
+- *Temporal TCoG*: Roughly, when in scaled time is F0 the highest? Earlier for falls, later for rises
 - *Frequency TCoG*: Here just mean F0 (can be weighted in various ways)
 
 
@@ -1288,7 +1288,7 @@ tcog_data %>%
   scale_color_colorblind()+
   scale_x_continuous(breaks = c(0.25,0.5,0.75))+
   geom_segment(aes(xend=propdur,y = diff_hi,yend=diff_lo),color="green3")+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   geom_line(color="gray40",size=0.9,lty=2)+facet_wrap(~id,nrow = 2)+ theme(strip.text = element_blank())+
   geom_line(aes(x=propdur,y=tunemean),size=2), rel_widths = c(1,1))
 
@@ -1316,7 +1316,7 @@ library(viridis)
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune))+
   scale_color_colorblind()+
   geom_segment(aes(xend=propdur,y = diff_hi,yend=diff_lo,color=rmsd))+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
 scale_color_viridis(option = "D",end = 0.9,begin=0.3)+
   scale_x_continuous(breaks = c(0,0.25,0.5,0.75,1))+
       scale_y_continuous(breaks = c(-1,0,1))+
@@ -1425,7 +1425,7 @@ ggplot(aes(x=cluster_8,y=tune,fill=Freq))+
 cluster_solutions %>% 
   mutate(cluster=cluster_2) %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
     theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
 
   geom_line(alpha=0.2,size=0.8)+scale_color_ptol()+scale_fill_ptol()+
@@ -1435,7 +1435,7 @@ cluster_solutions %>%
 cluster_solutions %>% 
   mutate(cluster=cluster_8) %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.1,size=0.7)+scale_color_ptol()+scale_fill_ptol()+
   ylim(-2.25,2.8)+
   theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
@@ -1569,14 +1569,14 @@ left_join(cluster_solutions,hc) -> cluster_solutions
 cluster_solutions %>% 
   mutate(cluster= as.factor(hc_cluster)) %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   ylim(-2.25,2.8)+
   geom_line(alpha=0.3,size=0.8)+scale_color_calc()-> traj_5_clusters1hc
 
 cluster_solutions %>% 
   mutate(cluster= as.factor(hc_cluster)) %>% 
   ggplot(aes(x= propdur,y= scaled_erb,group=id_tune,color=cluster,fill=cluster))+
-  ylab("normalised ERB")+xlab("prop. word duration")+
+  ylab("scaled ERB")+xlab("prop. word duration")+
   geom_line(alpha=0.15,size=0.8)+scale_color_calc()+scale_fill_calc()+
   ylim(-2.25,2.8)+
     stat_summary(geom="point",aes(group=cluster),pch=21,color="black",size=2.8)-> traj_5_clusters2hc
