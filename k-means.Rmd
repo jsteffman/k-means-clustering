@@ -154,7 +154,6 @@ speaker_means_wide$cluster_5<- getClusters(group_cluster_model, 5)
 speaker_means_wide$cluster_8<- getClusters(group_cluster_model, 8)
 
 
-
 speaker_means_wide %>% gather("normtime","scaled_erb",3:32) %>% 
   mutate(propdur=as.numeric(normtime)/30)-> cluster_solutions
 
